@@ -2,18 +2,24 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const dns = require("node:dns");
+
+require("dotenv").config({ path: require("path").join(__dirname, ".env") });
+
+const dnsServers = process.env.MONGODB_DNS_SERVERS
+  ?.split(",")
+  .map((server) => server.trim())
+  .filter(Boolean);
+
+if (dnsServers?.length) {
+  dns.setServers(dnsServers);
+}
 
 const app = express();
-  
+
 // Middleware
 app.use(cors());
 app.use(express.json());
-
-// Connect to MongoDB
-mongoose
-  .connect("mongodb://127.0.0.1:27017/taskmanager")
-  .then(() => console.log("MongoDB connected successfully"))
-  .catch((err) => console.error("MongoDB connection error:", err));
 
 // Define Task Schema
 const TaskSchema = new mongoose.Schema(
@@ -130,6 +136,37 @@ app.delete("/tasks/:id", async (req, res) => {
 // Start server
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+async function startServer() {
+  const mongoUri = process.env.MONGODB_URI;
+
+  if (!mongoUri) {
+    throw new Error("MONGODB_URI is not set. Add it to server/.env.");
+  }
+
+  await mongoose.connect(mongoUri);
+  console.log("MongoDB connected successfully");
+
+  app.listen(PORT, () => {
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+startServer().catch((error) => {
+  console.error("Failed to start server:", error.message);
+
+  const serverErrors = error.cause?.servers || error.reason?.servers;
+  if (serverErrors instanceof Map) {
+    for (const [address, server] of serverErrors) {
+      const cause = server.error;
+      console.error(
+        `MongoDB node ${address}: ${
+          cause
+            ? `${cause.name}${cause.code ? ` (${cause.code})` : ""}: ${cause.message}`
+            : server.type
+        }`
+      );
+    }
+  }
+
+  process.exitCode = 1;
 });
