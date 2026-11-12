@@ -29,20 +29,18 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: client/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install Dependencies
-        working-directory: client
         run: npm ci
 
       - name: Build React Application
-        working-directory: client
         run: npm run build
 
       - name: Upload Build Files
         uses: actions/upload-pages-artifact@v3
         with:
-          path: client/dist
+          path: dist
 
   deploy:
     environment:
